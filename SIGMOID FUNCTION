@@ -1,0 +1,225 @@
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import scipy.sparse
+import time
+%matplotlib inline
+from PIL import Image 
+from sklearn.linear_model import LogisticRegression
+from sklearn import metrics
+from sklearn.metrics import classification_report
+
+Load Dataset and Data Exploration
+
+def load_mnist(path, kind = 'train'):
+    """load dataset"""    
+    import os
+    import gzip
+    import numpy as np
+
+    labels_path = os.path.join(path,
+                               '%s-labels-idx1-ubyte.gz'
+                               % kind)
+    images_path = os.path.join(path,
+                               '%s-images-idx3-ubyte.gz'
+                               % kind)
+
+    with gzip.open(labels_path, 'rb') as lbpath:
+        labels = np.frombuffer(lbpath.read(), dtype=np.uint8,
+                               offset=8)
+
+    with gzip.open(images_path, 'rb') as imgpath:
+        images = np.frombuffer(imgpath.read(), dtype=np.uint8,
+                               offset=16).reshape(len(labels), 784)
+
+    return images, labels
+ # load in packages 
+load_mnist
+%reload_ext autoreload
+%autoreload 2
+
+# MNIST
+images_tr, labels_tr= load_mnist('MNIST/')
+images_tst, labels_tst = load_mnist('MNIST/', 't10k')
+# FASHION
+# images_tr, labels_tr = load_mnist('FashionMNIST/')
+# images_tst, labels_tst = load_mnist('FashionMNIST/', 't10k')
+
+# MNIST
+images_tr, labels_tr= load_mnist('MNIST/')
+images_tst, labels_tst = load_mnist('MNIST/', 't10k')
+# FASHION
+# images_tr, labels_tr = load_mnist('FashionMNIST/')
+# images_tst, labels_tst = load_mnist('FashionMNIST/', 't10k')# MNIST
+images_tr, labels_tr= load_mnist('MNIST/')
+images_tst, labels_tst = load_mnist('MNIST/', 't10k')
+# FASHION
+# images_tr, labels_tr = load_mnist('FashionMNIST/')
+# images_tst, labels_tst = load_mnist('FashionMNIST/', 't10k')
+
+# training set
+# normalization 
+x = images_tr/255 + 0.0001
+y, tx = build_model_data(images_tr, labels_tr)
+# test set
+x_tst = images_tst
+y_tst, tx_tst = build_model_data(images_tst, labels_tst)
+
+x.shape, y.shape,
+
+x_tst.shape, y_tst.shape
+
+# Visualization of labels count in training set
+sns.countplot(labels_tr)
+plt.title('Digit Count (Training Set)',  fontsize = 15)
+plt.show()
+
+# Visualization of labels count in test set
+sns.countplot(labels_tst)
+plt.title('Digit Count (Test Set)',  fontsize = 15)
+plt.show()
+
+# Visualization of digits
+f, ax = plt.subplots(1,5)
+f.set_size_inches(80, 40)
+for i in range(5):
+    ax[i].imshow(x[i].reshape(28, 28))
+plt.show()
+
+def showDigit(datasetname, index):
+    """Visualize specified digit"""
+    pic1 = datasetname[index]
+    pic1 = pic1.reshape((28, 28))
+    %matplotlib inline
+    plt.imshow(pic1, cmap='gray')
+    plt.axis('off')
+    
+showDigit(images_tr, 5)
+
+2 Binary Classification
+
+# build x2, y2, x2_tst, y2_tst.
+seed = 1
+
+# filtering the train dataset for binary classification (6 and 8)
+y2 = labels_tr[(labels_tr == 6) | (labels_tr == 8)] 
+# creat binary results (digit 6: 1, digit 8: 0)
+y2 = [1 if each == 6 else 0 for each in y2 ]
+y2 = np.array(y2)
+y2 = np.expand_dims(y2, axis=1)
+x2 = images_tr[(labels_tr == 6) | (labels_tr == 8)] 
+
+# normalization 
+x2 = x2 / 255 + 0.0001
+x2 = np.array(x2)
+
+
+y2_tst = labels_tst[(labels_tst == 6) | (labels_tst == 8)] 
+y2_tst = [1 if each == 6 else 0 for each in y2_tst ]
+y2_tst = np.array(y2_tst)
+y2_tst = np.expand_dims(y2_tst, axis=1)
+
+x2_tst = images_tst[(labels_tst == 6) | (labels_tst == 8)] 
+x2_tst = np.array(x2_tst)
+
+x2.shape, y2.shape, x2_tst.shape, y2_tst.shape
+
+2.1 Logistic Regression
+
+def sigmoid(t):
+    """apply sigmoid function on t."""
+    s = 1 / (1 + np.exp(-t)) 
+    
+    return s
+    
+2.1.1 Gradient Descent
+
+def getLoss(y, tx, w, lam):
+    """compute loss and gradient"""
+    n = y.shape[0]
+    scores = np.dot(tx,w)
+    p = sigmoid(scores)
+    loss = (-1 / n) * np.sum((y * np.log(p) + (1 - y) * np.log(1 - p))) + (lam / 2) * np.sum(w * w) 
+    grad = (-1 / n) * np.dot(tx.T, (y - p)) + lam / n * w
+
+    return loss, grad
+
+
+def logistic_regression_gradient_descent_demo_with_regularisation(y, x):
+    """run logistic regression with gradient descent"""    
+    startTime = time.time()
+
+    lam = 0   
+    tx = np.c_[np.ones((y.shape[0], 1)), x]
+    w = np.zeros((tx.shape[1], 1))
+    
+    iteration = 3000
+#     iteration = 5000
+    learning_rate = 0.2
+    threshold = 1e-8
+    losses = []
+    
+    for iter in range(iteration):
+        loss, grad = getLoss(y, tx, w, lam)
+        w = w - learning_rate * grad
+        w[0,1:] = w[0,1:] - lam * w[0,1:]
+
+        if iter % 100 == 0:
+            print("Current iteration = {i}, loss = {l}".format(i=iter, l=loss))
+        losses.append(loss)
+        if len(losses) > 1 and np.abs(losses[-1] - losses[-2]) < threshold:
+            break
+    print('Time(s):',time.time() - startTime) 
+    
+    plt.plot(losses)
+    plt.ylabel('Loss')
+    plt.xlabel('Iteration')
+    
+    return w
+
+w = logistic_regression_gradient_descent_demo_with_regularisation(y2, x2)
+
+def getAccuracy(x, y, w):
+    """compute accuracy"""  
+    tx = np.c_[np.ones((y.shape[0], 1)), x]
+    preds = (sigmoid(tx.dot(w)) >= 0.5).astype(np.int)
+    accuracy = (preds == y).mean()
+    
+    return accuracy, preds
+    
+ accuracy,pred = getAccuracy(x2, y2, w)
+act = y2
+accuracy_tst, pred_tst = getAccuracy(x2_tst, y2_tst, w)
+act_tst = y2_tst
+
+print ('Training Accuracy (Binary, Gradient Descent):', accuracy)
+print ('Test Accuracy (Binary, Gradient Descent):',accuracy_tst)
+
+cm = metrics.confusion_matrix(act, pred)
+print (cm)
+
+sns.heatmap(cm, annot = True, fmt="d", linewidths=.5, square = True,cmap='Blues')
+plt.ylabel('Actual Number')
+plt.xlabel('Predicted Number')
+score = round(accuracy,3)
+plt.title("Gradient Descent (Training Set)\nAccutacy: {0}".format(score),size=15)
+plt.figure(figsize=(5,5))
+
+print(classification_report(act, pred))
+
+cm_tst = metrics.confusion_matrix(act_tst, pred_tst)
+print (cm_tst)
+
+sns.heatmap(cm_tst, annot = True, fmt="d", linewidths=.5, square = True,cmap='Blues')
+plt.ylabel('Actual Number')
+plt.xlabel('Predicted Number')
+score = round(accuracy_tst,3)
+plt.title("Gradient Descent (Test Set)\nAccutacy: {0}".format(score),size=15)
+plt.figure(figsize=(5,5))
+
+print(classification_report(act_tst, pred_tst))
+
+
+
+
